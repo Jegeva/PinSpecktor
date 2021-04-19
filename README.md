@@ -14,16 +14,16 @@ For exemple, this can be usefull to
 
 
 Cause you didn't put them wide enough and it burns on your last pototype :
-- change the trace with on all traces in GND* to a specific width*
-- change the trace with on all traces in GND* to the new rule width*
+- change the trace with on all traces in GND* to a specific width[^1]
+- change the trace with on all traces in GND* to the new rule width[^1]
 
 
 Cause you fuxed your impedance calculation :
-- change the trace with on all traces in nets ADDR_.* to a specific width on a specific layer* 
+- change the trace with on all traces in nets ADDR_.* to a specific width on a specific layer[^1]
 
 
 
 
 
 
- * Yes, after the fact and violating DRC but setting that straight is your job
+ [^1]Yes, after the fact and (possibly) violating DRC but setting that straight is your job
