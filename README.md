@@ -1,4 +1,4 @@
-##PinSpector
+#PinSpector
 
 Mass, a posteriori manipulation tool in kicad
 
