@@ -1,10 +1,11 @@
-#PinSpector
+# PinSpector
 
 Mass, a posteriori manipulation tool in kicad
 
 Allows you to change local characteristics on multiple
 Pins, Nets & Footprints at the same time.
 
+## Thingies it does
 
 For exemple, this can be usefull to
 
