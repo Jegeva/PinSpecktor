@@ -22,4 +22,8 @@ Cause you fuxed your impedance calculation :
 - change the trace with on all traces in nets ADDR_.* to a specific width on a specific layer* 
 
 
-* Yes, after the fact and violating DRC but setting that straight is your job
+
+
+
+
+ * Yes, after the fact and violating DRC but setting that straight is your job
