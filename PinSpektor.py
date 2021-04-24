@@ -665,6 +665,7 @@ class PinSpektorDialog(wx.Dialog):
                         self.currSearch_results[s] = {}
                         self.currSearch_results[s]["f"]=f
                         self.currSearch_results[s]["p"]=p
+
         if( self.searchtype == 'n'):
             #debug_dialog("*")
             nbn = self.brd.GetNetsByName()
@@ -672,15 +673,16 @@ class PinSpektorDialog(wx.Dialog):
                 sn= str(n)
                 #print(sn)
                 if(len(sn)):
-                    if(sn[:4]!="no_c"):
-                        self.currSearch_results[sn] = {}
-                        self.currSearch_results[sn]["n"] = nbn[n]
-                        self.currSearch_results[sn]["tracks"] =[t for t in self.brd.GetTracks() if ((str(t.GetNet().GetNetname())==sn) and
+                    if(cre.search(sn)):
+                        if(sn[:4]!="no_c"):
+                            self.currSearch_results[sn] = {}
+                            self.currSearch_results[sn]["n"] = nbn[n]
+                            self.currSearch_results[sn]["tracks"] =[t for t in self.brd.GetTracks() if ((str(t.GetNet().GetNetname())==sn) and
                                                                                                     (
                                                                                                         isinstance(t,TRACK) and not
                                                                                                         isinstance(t,VIA)
                                                                                                     ))]
-                        self.currSearch_results[sn]["vias"]   =[t for t in self.brd.GetTracks() if ((str(t.GetNet().GetNetname())==sn) and isinstance(t,VIA  ))]
+                            self.currSearch_results[sn]["vias"]   =[t for t in self.brd.GetTracks() if ((str(t.GetNet().GetNetname())==sn) and isinstance(t,VIA  ))]
 
 
 
