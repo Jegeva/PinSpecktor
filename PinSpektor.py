@@ -108,6 +108,16 @@ class LabelledCheckBox(wx.BoxSizer):
         self.AddSpacer(WIDGET_SPACING)
         self.Add(self.ckbx, 0, wx.ALL | wx.ALIGN_TOP)
 
+class Labelled2CheckBox(wx.BoxSizer):
+    def __init__(self, parent, label, tooltip=""):
+        wx.BoxSizer.__init__(self, wx.HORIZONTAL)
+        self.ckbx = wx.CheckBox(
+            parent=parent,
+            label = label,
+            style=wx.CHK_3STATE
+        )
+        self.AddSpacer(WIDGET_SPACING)
+        self.Add(self.ckbx, 0, wx.ALL | wx.ALIGN_TOP)
 
 class PageF(wx.Panel):
     pc=None
@@ -116,8 +126,10 @@ class PageF(wx.Panel):
     spr=None
     dr=None
     dv=None
-    def __init__(self, parent):
+    psd=None
+    def __init__(self, parent,psd):
         wx.Panel.__init__(self, parent)
+        self.psd=psd
         self.s= wx.BoxSizer(wx.VERTICAL)
         self.dr       = LabelledCheckBox(self, "Display ref", "")
         self.dv       = LabelledCheckBox(self, "Display val", "")
@@ -146,7 +158,6 @@ class PageF(wx.Panel):
     def getdv(self):
         return(self.dv)
 
-
     def getallsilk(self):
         return(self.allsilk)
 
@@ -168,8 +179,10 @@ class PageP(wx.Panel):
     smc=None
     spac=None
     spr=None
-    def __init__(self, parent):
+    psd=None
+    def __init__(self, parent,psd):
         wx.Panel.__init__(self, parent)
+        self.psd=psd
         self.s= wx.BoxSizer(wx.VERTICAL)
         self.pc  =LabelledTextCtrl(self, "Pad clearance (mm)"            ,"" , "")
         self.smc =LabelledTextCtrl(self, "Solder mask clearance (mm)"    ,"" , "")
@@ -198,6 +211,15 @@ class PageP(wx.Panel):
     def getspr(self):
         return(self.spr)
 
+
+def getCopperActiveLayers():
+    b=GetBoard()
+    return [
+        b.GetLayerName(lid)
+        for lid in range(PCBNEW_LAYER_ID_START,PCB_LAYER_ID_COUNT)
+        if b.GetEnabledLayers().Contains(lid) and IsCopperLayer(lid)
+    ]
+
 class PageN(wx.Panel):
     useclass  =None
     clearance =None
@@ -209,18 +231,28 @@ class PageN(wx.Panel):
     dpwidth   =None
     dpgap     =None
 
-    def __init__(self, parent):
+    onlyonlayer = None
+    selectedlayer = None
+    psd = None
+    def __init__(self, parent,psd):
         wx.Panel.__init__(self, parent)
+        self.psd=psd
         self.s= wx.BoxSizer(wx.VERTICAL)
         self.useclass  =LabelledCheckBox(self, "Use net class values", "")
-        self.clearance =LabelledTextCtrl(self, "Clearance"            ,"" , "")
         self.trackw    =LabelledTextCtrl(self, "Track width"            ,"" , "")
         self.viasz     =LabelledTextCtrl(self, "Via Size"            ,"" , "")
         self.viahole   =LabelledTextCtrl(self, "Via Hole"            ,"" , "")
         self.uviasz    =LabelledTextCtrl(self, "µVia Size"            ,"" , "")
         self.uviahole  =LabelledTextCtrl(self, "µVia Hole"            ,"" , "")
-        self.dpwidth   =LabelledTextCtrl(self, "DP width"            ,"" , "")
-        self.dpgap     =LabelledTextCtrl(self, "DP Gap"            ,"" , "")
+        self.onlyonlayer = Labelled2CheckBox(self, "Only apply to these layers", "")
+        self.selectionlb = wx.ListBox(
+            parent=self,
+            choices= getCopperActiveLayers()
+            ,
+            style=wx.LB_MULTIPLE | wx.LB_NEEDED_SB | wx.LB_SORT,
+        )
+        self.selectionlb.Enable(False)
+
 
         self.s.Add(self.useclass, 0, wx.ALL |  wx.EXPAND| wx.ALIGN_TOP)
         self.s.AddSpacer(WIDGET_SPACING)
@@ -240,23 +272,84 @@ class PageN(wx.Panel):
         self.s.Add(self.uviahole, 0, wx.ALL  |  wx.EXPAND)
         self.s.AddSpacer(WIDGET_SPACING)
 
-        self.s.Add(self.dpwidth, 0, wx.ALL  |  wx.EXPAND)
+        self.s.Add(self.onlyonlayer, 0, wx.ALL  |  wx.EXPAND)
         self.s.AddSpacer(WIDGET_SPACING)
-        self.s.Add(self.dpgap, 0, wx.ALL  |  wx.EXPAND)
-        self.s.AddSpacer(WIDGET_SPACING)
+        self.s.Add(self.selectionlb, 0, wx.ALL  |  wx.EXPAND)
+
 
         self.SetSizer(self.s)
         self.Layout()
         self.Fit()
 
+        self.onlyonlayer.ckbx.Bind(wx.EVT_CHECKBOX,self.clickOnlyOnLayer,self.onlyonlayer.ckbx)
+        self.useclass.ckbx.Bind(wx.EVT_CHECKBOX,self.clickUseClass,self.useclass.ckbx)
 
-def getPcbnewItemByClassAndREName(itype,rename):
-    typeclassh = {
-        "f":FOOTPRINT,
-        "n":NETINFO_ITEM,
-        "p":PAD
-    }
-    iclass = typeclassh[itype]
+    def clickOnlyOnLayer(self,evt):
+        if(self.selectionlb.IsEnabled()):
+            self.selectionlb.Enable(False)
+        else:
+            self.selectionlb.Enable(True)
+
+    def clickUseClass(self,evt):
+        if(self.trackw.ctrl.IsEnabled()):
+            self.trackw.ctrl.SetValue("")
+            self.trackw.ctrl.Enable(False)
+            self.viasz.ctrl.SetValue("")
+            self.viasz.ctrl.Enable(False)
+            self.uviasz.ctrl.SetValue("")
+            self.uviasz.ctrl.Enable(False)
+            self.viahole.ctrl.SetValue("")
+            self.viahole.ctrl.Enable(False)
+            self.uviahole.ctrl.SetValue("")
+            self.uviahole.ctrl.Enable(False)
+            self.onlyonlayer.ckbx.Enable(False)
+            self.selectionlb.Enable(False)
+        else:
+            self.trackw.ctrl.Enable(True)
+            self.viahole.ctrl.Enable(True)
+            self.uviahole.ctrl.Enable(True)
+            self.viasz.ctrl.Enable(True)
+            self.uviasz.ctrl.Enable(True)
+            self.onlyonlayer.ckbx.Enable(True)
+
+            if(self.onlyonlayer.ckbx.GetValue()):
+                self.selectionlb.Enable(True)
+
+            #print(self.psd.selectionlb.lbx.GetSelections())
+            self.psd.lbsclicked(None)
+
+
+        return
+
+    def getUseClass(self):
+        return self.useclass
+    def getTrackW(self):
+        return self.trackw
+    def getViaSz(self):
+        return self.viasz
+    def getViaHole(self):
+        return self.viahole
+    def getUViaSz(self):
+        return self.uviasz
+    def getUViahole(self):
+        return self.uviahole
+    def getOnlyLayer(self):
+        return self.onlyonlayer
+    def getSelLayer(self):
+        return self.selectionlb
+
+
+
+
+
+
+#def getPcbnewItemByClassAndREName(itype,rename):
+#    typeclassh = {
+#        "f":FOOTPRINT,
+#        "n":NETINFO_ITEM,
+#        "p":PAD
+#    }
+#    iclass = typeclassh[itype]
 
 class PinSpektorDialog(wx.Dialog):
     searchre = '.'
@@ -299,7 +392,7 @@ class PinSpektorDialog(wx.Dialog):
             self.left_sizer.Add(self.searchre_field, 0, wx.ALL | wx.EXPAND, WIDGET_SPACING)
 
             self.nb = wx.Notebook(panel,size=(400, 600))
-            self.pages = [ PageF(self.nb), PageN(self.nb), PageP(self.nb)]
+            self.pages = [ PageF(self.nb,self), PageN(self.nb,self), PageP(self.nb,self)]
 
             self.nb.AddPage(self.pages[0], "Footprint")
             self.nb.AddPage(self.pages[1], "Net")
@@ -473,6 +566,68 @@ class PinSpektorDialog(wx.Dialog):
         return
 
 
+    def lbsclicked_n(self,selected):
+
+        v_useclass  = False
+        v_trackw    =None
+        v_viasz     =None
+        v_viahole   =None
+        v_uviasz    =None
+        v_uviahole  =None
+        page=self.currpage
+        self.currSelection=[]
+        for s in selected:
+            self.currSelection.append(s)
+
+            n=self.currSearch_results[s]["n"]
+            self.currSearch_results[s]["sel"]=True
+
+            for t in self.currSearch_results[s]["tracks"]:
+                if(v_trackw == None):
+                    v_trackw    = t.GetWidth()/1e6
+                else:
+                    if( v_trackw!= t.GetWidth()/1e6):
+                        v_trackw = "MULTIPLE VALUES"
+
+            for t in self.currSearch_results[s]["vias"]:
+                #print("via type",t.GetViaType())
+                if(t.GetViaType() == VIATYPE_MICROVIA):
+                    if(v_uviasz == None):
+                        v_uviasz    = t.GetWidth()/1e6
+                        v_uviahole  = t.GetDrill()/1e6
+
+                    else:
+                        if( v_uviasz!= t.GetWidth()/1e6):
+                            v_uviasz = "MULTIPLE VALUES"
+                        if( v_uviahole!= t.GetDrill()/1e6):
+                            v_uviahole = "MULTIPLE VALUES"
+
+                if(t.GetViaType() == VIATYPE_THROUGH):
+                    if(v_viasz == None):
+                        v_viasz    = t.GetWidth()/1e6
+                        v_viahole  = t.GetDrill()/1e6
+
+                    else:
+                        if( v_viasz!= t.GetWidth()/1e6):
+                            v_viasz = "MULTIPLE VALUES"
+                        if( v_viahole!= t.GetDrill()/1e6):
+                            v_viahole = "MULTIPLE VALUES"
+
+        if(v_trackw):
+            page.getTrackW().ctrl.SetValue(str(v_trackw))
+        if(v_viasz):
+            page.getViaSz().ctrl.SetValue(str(v_viasz))
+        if(v_viahole):
+            page.getViaHole().ctrl.SetValue(str(v_viahole))
+        if(v_uviasz):
+            page.getUViaSz().ctrl.SetValue(str(v_uviasz))
+        if(v_uviahole):
+            page.getUViaHole().ctrl.SetValue(str(v_uviahole))
+
+        return
+
+
+
     def lbsclicked(self,evt):
         selected =  [self.selectionlb.lbx.GetString(i) for i in self.selectionlb.lbx.GetSelections()]
         #debug_dialog("seleected "+str(selected))
@@ -515,9 +670,19 @@ class PinSpektorDialog(wx.Dialog):
             nbn = self.brd.GetNetsByName()
             for n in nbn.keys():
                 sn= str(n)
+                #print(sn)
                 if(len(sn)):
                     if(sn[:4]!="no_c"):
-                        self.currSearch_results[sn] = nbn[n]
+                        self.currSearch_results[sn] = {}
+                        self.currSearch_results[sn]["n"] = nbn[n]
+                        self.currSearch_results[sn]["tracks"] =[t for t in self.brd.GetTracks() if ((str(t.GetNet().GetNetname())==sn) and
+                                                                                                    (
+                                                                                                        isinstance(t,TRACK) and not
+                                                                                                        isinstance(t,VIA)
+                                                                                                    ))]
+                        self.currSearch_results[sn]["vias"]   =[t for t in self.brd.GetTracks() if ((str(t.GetNet().GetNetname())==sn) and isinstance(t,VIA  ))]
+
+
 
         lst= list(self.currSearch_results.keys())
         self.selectionlb.lbx.InsertItems(lst,0)
@@ -598,6 +763,105 @@ class PinSpektorDialog(wx.Dialog):
 
 
     def apply_n(self):
+        page=self.currpage
+
+        v_useclass  =None
+        v_trackw    =None
+        v_viasz     =None
+        v_viahole   =None
+        v_uviasz    =None
+        v_uviahole  =None
+        v_onlylayer =None
+        v_tlayers   =None
+
+        v_useclass  = page.getUseClass().ckbx.GetValue()
+
+        try:
+            v_trackw    = float(page.getTrackW().ctrl.GetValue())
+        except ValueError as e:
+            pass
+        try:
+            v_viasz     = float(page.getViaSz().ctrl.GetValue())
+        except ValueError as e:
+            pass
+        try:
+            v_viahole   = float(page.getViaHole().ctrl.GetValue())
+        except ValueError as e:
+            pass
+        try:
+            v_uviasz    = float(page.getUViaSz().ctrl.GetValue())
+        except ValueError as e:
+            pass
+        try:
+            v_uviahole  = float(page.getUViahole().ctrl.GetValue())
+        except ValueError as e:
+            pass
+
+        v_onlylayer = page.getOnlyLayer().ckbx.GetValue()
+        v_tlayers   = [ page.getSelLayer().GetString(i) for i in page.getSelLayer().GetSelections()]
+
+        print(v_tlayers)
+
+        for s in self.currSelection :
+            if(v_useclass):
+                netclasses=self.brd.GetDesignSettings().GetNetClasses()
+                defaultClass = netclasses.GetDefault()
+                d_trackw=defaultClass.GetTrackWidth()
+                d_viasz=defaultClass.GetViaDiameter()
+                d_viahole=defaultClass.GetViaDrill()
+                d_uviasz=defaultClass.GetuViaDiameter()
+                d_uviahole=defaultClass.GetuViaDrill()
+
+                if(self.brd.GetDesignSettings().GetNetClasses().GetCount() == 0):
+                    v_trackw    = d_trackw
+                    v_viasz     = d_viasz
+                    v_viahole   = d_viahole
+                    v_uviasz    = d_uviasz
+                    v_uviahole  = d_uviahole
+
+            for t in self.currSearch_results[s]["tracks"]:
+
+                if(v_onlylayer and (self.brd.GetLayerName(t.GetLayer()) not in v_tlayers)):
+                    continue
+
+                if(v_useclass):
+                    if(t.GetNetClassName() == "Default"):
+                        t.SetWidth(defaultClass.GetTrackWidth())
+                    else :
+                        t.SetWidth(netclasses.NetClasses()[t.GetNetClassName()].GetTrackWidth())
+                else:
+                    if(v_trackw):
+                        t.SetWidth(int(v_trackw*1e6))
+
+            for t in self.currSearch_results[s]["vias"]:
+                if(t.GetViaType() == VIATYPE_MICROVIA):
+                    if(v_useclass):
+                        if(t.GetNetClassName() == "Default"):
+                            t.SetDrill(defaultClass.GetuViaDrill())
+                            t.SetWidth(defaultClass.GetuViaDiameter())
+
+                        else :
+                            t.SetDrill(netclasses.NetClasses()[t.GetNetClassName()].GetuViaDrill())
+                            t.SetWidth(netclasses.NetClasses()[t.GetNetClassName()].GetuViaDiameter())
+
+                    else:
+                        if(v_uviasz != None):
+                            t.SetWidth(int(v_uviasz*1e6))
+                            t.SetDrill(int(v_uviahole*1e6))
+                if(t.GetViaType() == VIATYPE_THROUGH):
+                    if(v_useclass):
+                        if(t.GetNetClassName() == "Default"):
+                            t.SetDrill(defaultClass.GetViaDrill())
+                            t.SetWidth(defaultClass.GetViaDiameter())
+
+                        else :
+                            t.SetDrill(netclasses.NetClasses()[t.GetNetClassName()].GetViaDrill())
+                            t.SetWidth(netclasses.NetClasses()[t.GetNetClassName()].GetViaDiameter())
+
+                    else:
+                        if(v_viasz != None):
+                            t.SetWidth(int(v_viasz*1e6))
+                            t.SetDrill(int(v_viahole*1e6))
 
         return
 
@@ -608,7 +872,7 @@ class PinSpektorDialog(wx.Dialog):
             self.apply_f()
         if(self.searchtype == 'n'):
             self.apply_n()
-
+        Refresh()
         return
 
     def set_searchre(self, evt):
@@ -619,8 +883,9 @@ class PinSpektorDialog(wx.Dialog):
     def cancel(self, evt):
         self.searchre = '.'
         #self.searchtype = FOOTPRINT
-        self.Close()
-
+        #self.Show(False)
+        #self.Close()
+        self.EndModal(0)
 
 def get_stuff_on_nets(*nets):
     """Get all the pads, tracks, zones attached to a net."""
@@ -641,19 +906,19 @@ def get_stuff_on_nets(*nets):
             stuff.extend([thing for thing in all_stuff if thing.GetNetname() == net])
     return stuff
 
-
-#
-def PinSpektor_callback(evt):
-
-    #debug_dialog("PI CB")
-    pin_inspecter = PinSpektorDialog(title="Inspect Pins",tool_tip="",brd=getbrd())
-
-    return
-
 def getbrd():
     return GetBoard()
 
 class PinSpektorPlugin(ActionPlugin):
+    pin_inspecter = None
+
+    @staticmethod
+    def getPSD(self):
+        if(PinSpektorPlugin.pin_inspecter == None):
+            PinSpektorPlugin.pin_inspecter=PinSpektorDialog(title="Inspect Pins",tool_tip="",brd=getbrd())
+        PinSpektorPlugin.pin_inspecter.ShowModal()
+        return PinSpektorPlugin.pin_inspecter
+
 
     def findPcbnewWindow(self):
         """Find the window for the PCBNEW application."""
@@ -673,6 +938,8 @@ class PinSpektorPlugin(ActionPlugin):
     def Run(self):
 
         if(not self.button_inited):
+            #for i in range(20):
+            #    print("\n")
             try:
                 top_toolbar = wx.FindWindowById(ID_H_TOOLBAR, parent=self.findPcbnewWindow())
 
@@ -691,13 +958,13 @@ class PinSpektorPlugin(ActionPlugin):
                     "Inspect Pins",
                     wx.ITEM_NORMAL,
                 )
-                top_toolbar.Bind(wx.EVT_TOOL, PinSpektor_callback, id=PinSpektor_button)
+                top_toolbar.Bind(wx.EVT_TOOL, PinSpektorPlugin.getPSD, id=PinSpektor_button)
             except Exception as e:
                 debug_dialog("Something went wrong!", e)
 
 
             top_toolbar.Realize()
             self.button_inited = True  # Buttons now installed in toolbar.
-            pin_inspecter = PinSpektorDialog(title="Inspect Pins",tool_tip="",brd=getbrd())
+            self.pin_inspecter = self.getPSD(self)
 
 PinSpektorPlugin().register() # Instantiate and register to Pcbnew
